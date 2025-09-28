@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Modern Sudoku 6x6</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-light: #ffffff;
+      --text-dark: #0f172a;
+      --text-light: #f1f5f9;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --border: #cbd5e1;
+      --error: #ef4444;
+      --success: #10b981;
+      --selected: #dbeafe;
+      --region-border: #475569;
+      --cell-bg: #f8fafc;
+      --readonly-bg: #e2e8f0;
+      --hover-bg: #f1f5f9;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, var(--bg-dark) 0%, #1e293b 100%);
+      color: var(--text-light);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    header {
+      text-align: center;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(to right, #93c5fd, #60a5fa, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .game-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      border-radius: 24px;
+      padding: 32px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+
+    .timer {
+      font-size: 1.4rem;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 12px 24px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .timer i {
+      color: var(--accent);
+    }
+
+    .message {
+      margin: 16px 0;
+      min-height: 28px;
+      font-weight: 600;
+      font-size: 1.1rem;
+      text-align: center;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.15);
+      transition: all 0.3s ease;
+    }
+
+    .success { 
+      color: var(--success); 
+      background: rgba(16, 185, 129, 0.15);
+    }
+    
+    .error-text { 
+      color: var(--error); 
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 2px;
+      margin: 24px auto;
+      max-width: 480px;
+      background: var(--region-border);
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      background: var(--cell-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      cursor: pointer;
+      position: relative;
+      font-weight: 700;
+      font-size: 1.8rem;
+      color: var(--text-dark);
+      border: 2px solid var(--border);
+    }
+
+    .cell.readonly {
+      background: var(--readonly-bg);
+      color: #475569;
+      font-weight: 600;
+      cursor: default;
+    }
+
+    .cell.selected {
+      background: var(--selected);
+      transform: scale(1.05);
+      z-index: 2;
+      box-shadow: 0 0 0 3px var(--accent);
+    }
+
+    .cell.error-cell {
+      background: #fee2e2 !important;
+      color: var(--error) !important;
+      animation: shake 0.5s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    /* Region borders */
+    .sudoku-grid > div:nth-child(-n+6) { border-top: 3px solid var(--region-border); }
+    .sudoku-grid > div:nth-child(n+7):nth-child(-n+12) { border-top: 3px solid var(--region-border); }
+    .sudoku-grid > div:nth-child(n+13):nth-child(-n+18) { border-top: 3px solid var(--region-border); }
+    .sudoku-grid > div:nth-child(n+19):nth-child(-n+24) { border-top: 3px solid var(--region-border); }
+    .sudoku-grid > div:nth-child(n+25):nth-child(-n+30) { border-top: 3px solid var(--region-border); }
+    .sudoku-grid > div:nth-child(n+31):nth-child(-n+36) { border-top: 3px solid var(--region-border); }
+
+    .sudoku-grid > div:nth-child(6n+1) { border-left: 3px solid var(--region-border); }
+    .sudoku-grid > div:nth-child(6n+4) { border-right: 3px solid var(--region-border); }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 24px 0;
+      max-width: 480px;
+    }
+
+    .number-btn {
+      height: 64px;
+      font-size: 1.6rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 16px;
+      background: var(--bg-light);
+      color: var(--text-dark);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .number-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+      background: #f1f5f9;
+    }
+
+    .number-btn:active {
+      transform: translateY(0);
+    }
+
+    .action-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      padding: 14px 28px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 16px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .action-btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+
+    .action-btn:active {
+      transform: translateY(0);
+    }
+
+    .action-btn.secondary {
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--text-light);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .action-btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    .win-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    .win-screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .win-content {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      padding: 40px;
+      border-radius: 24px;
+      text-align: center;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      transform: translateY(20px);
+      transition: transform 0.5s ease;
+    }
+
+    .win-screen.active .win-content {
+      transform: translateY(0);
+    }
+
+    .win-content h2 {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      color: white;
+    }
+
+    .win-content p {
+      font-size: 1.4rem;
+      margin-bottom: 32px;
+      color: #dbeafe;
+    }
+
+    #confetti-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      opacity: 0;
+    }
+
+    footer {
+      margin-top: 24px;
+      text-align: center;
+      opacity: 0.7;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 2.2rem;
+      }
+      
+      .game-card {
+        padding: 24px 16px;
+      }
+      
+      .sudoku-grid {
+        max-width: 360px;
+        gap: 1px;
+      }
+      
+      .cell {
+        font-size: 1.5rem;
+      }
+      
+      .controls {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      
+      .number-btn {
+        height: 56px;
+        font-size: 1.4rem;
+      }
+      
+      .action-btn {
+        padding: 12px 20px;
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>SUDOKU 6×6</h1>
+      <p class="subtitle">Each row, column, and region must contain the numbers 1–6 with no repeats</p>
+    </header>
+    
+    <div class="game-card">
+      <div class="stats-bar">
+        <div class="timer">
+          <i class="fas fa-clock"></i>
+          <span id="timer">00:00</span>
+        </div>
+      </div>
+      
+      <div class="message" id="message">Select an empty cell and choose a number</div>
+      
+      <div class="sudoku-grid" id="grid"></div>
+      
+      <div class="controls">
+        <button class="number-btn" data-num="1">1</button>
+        <button class="number-btn" data-num="2">2</button>
+        <button class="number-btn" data-num="3">3</button>
+        <button class="number-btn" data-num="4">4</button>
+        <button class="number-btn" data-num="5">5</button>
+        <button class="number-btn" data-num="6">6</button>
+        <button class="number-btn" id="erase-btn"><i class="fas fa-eraser"></i></button>
+        <button class="number-btn" id="undo-btn"><i class="fas fa-undo"></i></button>
+        <button class="number-btn" id="hint-btn"><i class="fas fa-lightbulb"></i></button>
+      </div>
+      
+      <div class="action-buttons">
+        <button class="action-btn secondary" id="check-btn">
+          <i class="fas fa-check-circle"></i> Verify
+        </button>
+        <button class="action-btn" id="new-game-btn">
+          <i class="fas fa-redo"></i> New Game
+        </button>
+      </div>
+    </div>
+    
+    <footer>
+      <p>Modern Sudoku 6×6 • Complete the puzzle following the rules</p>
+    </footer>
+  </div>
+  
+  <div class="win-screen" id="win-screen">
+    <div class="win-content">
+      <h2>Congratulations!</h2>
+      <p>You solved the puzzle in <span id="final-time">00:00</span></p>
+      <button class="action-btn" id="play-again-btn">
+        <i class="fas fa-play"></i> Play Again
+      </button>
+    </div>
+  </div>
+  
+  <div id="confetti-container"></div>
+  <audio id="win-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" preload="auto"></audio>
+
+  <script>
+    let currentPuzzle = [];
+    let timerInterval;
+    let startTime;
+    let elapsedTime = 0;
+    let selectedCell = null;
+    let gameActive = true;
+    let history = [];
+
+    // Generate a valid 6x6 Sudoku solution
+    function generateSolvedBoard() {
+      // Create a base pattern for 6x6 Sudoku
+      const board = [
+        [1, 2, 3, 4, 5, 6],
+        [4, 5, 6, 1, 2, 3],
+        [2, 3, 1, 5, 6, 4],
+        [5, 6, 4, 2, 3, 1],
+        [3, 1, 2, 6, 4, 5],
+        [6, 4, 5, 3, 1, 2]
+      ];
+      
+      return board;
+    }
+
+    function isValidFullBoard(board) {
+      // Validate rows
+      for (let r = 0; r < 6; r++) {
+        if (!isValidGroup(board[r])) return false;
+      }
+      
+      // Validate columns
+      for (let c = 0; c < 6; c++) {
+        const col = [board[0][c], board[1][c], board[2][c], board[3][c], board[4][c], board[5][c]];
+        if (!isValidGroup(col)) return false;
+      }
+      
+      // Validate regions (2x3)
+      for (let qr = 0; qr < 3; qr++) {
+        for (let qc = 0; qc < 2; qc++) {
+          const region = [];
+          for (let r = qr*2; r < qr*2 + 2; r++) {
+            for (let c = qc*3; c < qc*3 + 3; c++) {
+              region.push(board[r][c]);
+            }
+          }
+          if (!isValidGroup(region)) return false;
+        }
+      }
+      return true;
+    }
+
+    function isValidGroup(group) {
+      const seen = new Set();
+      for (let num of group) {
+        if (num < 1 || num > 6 || seen.has(num)) return false;
+        seen.add(num);
+      }
+      return true;
+    }
+
+    function generatePuzzle(emptyCells = 20) {
+      const solved = generateSolvedBoard();
+      let puzzle = JSON.parse(JSON.stringify(solved));
+      let positions = [];
+      
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          positions.push([r, c]);
+        }
+      }
+      
+      // Shuffle positions
+      for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+      }
+      
+      // Empty cells
+      for (let i = 0; i < emptyCells; i++) {
+        const [r, c] = positions[i];
+        puzzle[r][c] = 0;
+      }
+      
+      return puzzle;
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      startTime = Date.now() - elapsedTime;
+      timerInterval = setInterval(() => {
+        elapsedTime = Date.now() - startTime;
+        document.getElementById("timer").textContent = formatTime(elapsedTime);
+      }, 100);
+    }
+
+    function formatTime(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSec / 60).toString().padStart(2, '0');
+      const seconds = (totalSec % 60).toString().padStart(2, '0');
+      return `${minutes}:${seconds}`;
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          
+          if (currentPuzzle[r][c] !== 0) {
+            cell.textContent = currentPuzzle[r][c];
+            cell.classList.add("readonly");
+          } else {
+            cell.addEventListener("click", () => selectCell(cell));
+          }
+          
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function selectCell(cellElement) {
+      if (!gameActive) return;
+      
+      // Deselect previous
+      if (selectedCell) {
+        selectedCell.classList.remove("selected");
+      }
+      
+      // Select new
+      cellElement.classList.add("selected");
+      selectedCell = cellElement;
+      
+      const row = parseInt(cellElement.dataset.row) + 1;
+      const col = parseInt(cellElement.dataset.col) + 1;
+      showMessage(`Selected cell: (${row}, ${col})`);
+    }
+
+    function placeNumber(num) {
+      if (!gameActive || !selectedCell) {
+        if (gameActive) showMessage("Select an empty cell first", "error-text");
+        return;
+      }
+      
+      const row = parseInt(selectedCell.dataset.row);
+      const col = parseInt(selectedCell.dataset.col);
+      
+      // Save to history for undo
+      history.push({
+        row,
+        col,
+        old: selectedCell.textContent,
+        new: num
+      });
+      
+      selectedCell.textContent = num;
+      selectedCell.classList.remove("error-cell");
+      showMessage(`Placed number ${num}`);
+      
+      // Check if board is complete
+      if (isBoardComplete()) {
+        setTimeout(checkSolution, 100);
+      }
+    }
+
+    function eraseCell() {
+      if (!gameActive || !selectedCell) return;
+      
+      const row = parseInt(selectedCell.dataset.row);
+      const col = parseInt(selectedCell.dataset.col);
+      
+      if (selectedCell.classList.contains("readonly")) return;
+      
+      history.push({
+        row,
+        col,
+        old: selectedCell.textContent,
+        new: ""
+      });
+      
+      selectedCell.textContent = "";
+      selectedCell.classList.remove("error-cell");
+      showMessage("Cell erased");
+    }
+
+    function undoLast() {
+      if (history.length === 0) {
+        showMessage("No actions to undo", "error-text");
+        return;
+      }
+      
+      const last = history.pop();
+      const cell = document.querySelector(`.cell[data-row="${last.row}"][data-col="${last.col}"]`);
+      
+      if (cell) {
+        cell.textContent = last.old;
+        cell.classList.remove("error-cell");
+        showMessage(`Undid action in cell (${last.row+1}, ${last.col+1})`);
+      }
+    }
+
+    function isBoardComplete() {
+      const cells = document.querySelectorAll(".cell:not(.readonly)");
+      for (let cell of cells) {
+        if (cell.textContent === "") return false;
+      }
+      return true;
+    }
+
+    function clearErrors() {
+      document.querySelectorAll(".error-cell").forEach(el => el.classList.remove("error-cell"));
+    }
+
+    function checkSolution() {
+      if (!gameActive) return;
+      clearErrors();
+      
+      const userBoard = [];
+      for (let r = 0; r < 6; r++) {
+        userBoard[r] = [];
+        for (let c = 0; c < 6; c++) {
+          const cell = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+          const val = cell.textContent === "" ? 0 : parseInt(cell.textContent);
+          userBoard[r][c] = val;
+        }
+      }
+      
+      let hasErrors = false;
+      
+      // Validate rows
+      for (let r = 0; r < 6; r++) {
+        if (!isValidGroup(userBoard[r])) {
+          for (let c = 0; c < 6; c++) markCellError(r, c);
+          hasErrors = true;
+        }
+      }
+      
+      // Validate columns
+      for (let c = 0; c < 6; c++) {
+        const col = [userBoard[0][c], userBoard[1][c], userBoard[2][c], userBoard[3][c], userBoard[4][c], userBoard[5][c]];
+        if (!isValidGroup(col)) {
+          for (let r = 0; r < 6; r++) markCellError(r, c);
+          hasErrors = true;
+        }
+      }
+      
+      // Validate regions
+      for (let qr = 0; qr < 3; qr++) {
+        for (let qc = 0; qc < 2; qc++) {
+          const region = [];
+          for (let r = qr*2; r < qr*2 + 2; r++) {
+            for (let c = qc*3; c < qc*3 + 3; c++) {
+              region.push(userBoard[r][c]);
+            }
+          }
+          if (!isValidGroup(region)) {
+            for (let r = qr*2; r < qr*2 + 2; r++) {
+              for (let c = qc*3; c < qc*3 + 3; c++) {
+                markCellError(r, c);
+              }
+            }
+            hasErrors = true;
+          }
+        }
+      }
+      
+      if (hasErrors) {
+        showMessage("There are errors in the marked cells", "error-text");
+      } else {
+        celebrateWin();
+      }
+    }
+
+    function markCellError(row, col) {
+      const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+      if (cell && !cell.classList.contains("readonly")) {
+        cell.classList.add("error-cell");
+      }
+    }
+
+    function showMessage(text, className = "") {
+      const msgDiv = document.getElementById("message");
+      msgDiv.textContent = text;
+      msgDiv.className = "message " + className;
+    }
+
+    function celebrateWin() {
+      gameActive = false;
+      clearInterval(timerInterval);
+      
+      // Show win screen
+      document.getElementById("final-time").textContent = formatTime(elapsedTime);
+      document.getElementById("win-screen").classList.add("active");
+      
+      // Play sound
+      const winSound = document.getElementById("win-sound");
+      winSound.currentTime = 0;
+      winSound.play().catch(e => console.log("Audio play failed:", e));
+      
+      // Launch confetti
+      launchConfetti();
+    }
+
+    function launchConfetti() {
+      const confettiContainer = document.getElementById("confetti-container");
+      confettiContainer.innerHTML = "";
+      
+      for (let i = 0; i < 200; i++) {
+        const confetti = document.createElement("div");
+        confetti.className = "confetti";
+        confetti.style.left = Math.random() * 100 + "vw";
+        confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        confetti.style.width = Math.random() * 10 + 5 + "px";
+        confetti.style.height = Math.random() * 10 + 5 + "px";
+        confettiContainer.appendChild(confetti);
+        
+        const duration = 2 + Math.random() * 3;
+        const delay = Math.random() * 1;
+        confetti.animate(
+          [
+            { transform: `translateY(-100vh) rotate(0deg)`, opacity: 1 },
+            { transform: `translateY(100vh) rotate(${360 + Math.random() * 720}deg)`, opacity: 0 }
+          ],
+          {
+            duration: duration * 1000,
+            delay: delay * 1000,
+            easing: "cubic-bezier(0.1, 0.9, 0.4, 1)",
+            fill: "forwards"
+          }
+        );
+      }
+    }
+
+    function startNewGame() {
+      gameActive = true;
+      history = [];
+      
+      // Hide win screen
+      document.getElementById("win-screen").classList.remove("active");
+      
+      // Generate new puzzle
+      currentPuzzle = generatePuzzle(20);
+      renderGrid();
+      showMessage("Select an empty cell and choose a number");
+      
+      // Reset timer
+      elapsedTime = 0;
+      document.getElementById("timer").textContent = "00:00";
+      startTimer();
+      
+      // Clear selection
+      if (selectedCell) {
+        selectedCell.classList.remove("selected");
+        selectedCell = null;
+      }
+      
+      // Clear confetti
+      document.getElementById("confetti-container").innerHTML = "";
+    }
+
+    // Initialize game
+    document.addEventListener("DOMContentLoaded", () => {
+      // Number buttons
+      document.querySelectorAll(".number-btn:not(#erase-btn):not(#undo-btn):not(#hint-btn)").forEach(btn => {
+        btn.addEventListener("click", () => placeNumber(btn.dataset.num));
+      });
+      
+      // Special buttons
+      document.getElementById("erase-btn").addEventListener("click", eraseCell);
+      document.getElementById("undo-btn").addEventListener("click", undoLast);
+      document.getElementById("hint-btn").addEventListener("click", () => {
+        showMessage("Hint: Look for cells with only one possible number", "success");
+      });
+      
+      // Action buttons
+      document.getElementById("check-btn").addEventListener("click", checkSolution);
+      document.getElementById("new-game-btn").addEventListener("click", startNewGame);
+      document.getElementById("play-again-btn").addEventListener("click", startNewGame);
+      
+      // Start first game
+      startNewGame();
+    });
+  </script>
+</body>
+</html>
