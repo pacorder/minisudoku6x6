@@ -1,0 +1,1 @@
+# minisudoku6x6
